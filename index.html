@@ -1,0 +1,487 @@
+<!DOCTYPE HTML>
+						<html lang="en">
+						<head>
+							<meta charset="UTF-8">
+							<meta name="viewport" content="width=device-width, initial-scale=1.0">
+							<title>3D Chessboard</title>
+							<style>
+		 body {
+            margin: 0;
+            padding: 0;
+            font-family: Arial, sans-serif;
+            background: radial-gradient(circle, #ff7e5f, #feb47b); 
+            color: #eaeaea;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+
+								#leftPanel {
+									display: flex;
+									flex-direction: column;
+									align-items: flex-start;
+									margin-bottom: 20px;
+								}
+
+								#chessboard {
+									width: 700px;
+									height: 700px;
+									display: grid;
+									grid-template-columns: repeat(8, 1fr);
+									grid-template-rows: repeat(8, 1fr);
+									border: 10px solid #8e4e4e;
+									transform: perspective(1000px) rotateX(45deg);
+									
+								}
+
+								.chess-square {
+									width: 100%;
+									height: 100%;
+									display: flex;
+									justify-content: center;
+									align-items: center;
+									box-sizing: border-box;
+									transition: transform 0.3s, box-shadow 0.3s;
+									transform-style: preserve-3d;
+									cursor: pointer;
+								}
+
+								.chess-square:nth-child(even) {
+									background-color: #eda2a2;
+								}
+
+								.chess-square:nth-child(odd) {
+									background-color: #b38787;
+								}
+
+								.chess-square.highlighted {
+									background-color: rgb(186, 241, 241) !important;
+								}
+
+								.token {
+									width: 80px;
+									height: 80px;
+									display: flex;
+									justify-content: center;
+									align-items: center;
+									font-size: 24px;
+									border-radius: 50%;
+									background-color: rgb(8, 7, 7);
+									cursor: grab;
+									box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+									transition: transform 0.3s;
+								}
+
+								.token:hover {
+									transform: scale(1.2) rotate(5deg);
+									box-shadow: 0 10px 20px rgba(0, 0, 0, 0.5);
+								}
+
+								.token:active {
+									cursor: grabbing;
+								}
+
+							 /* Buttons Styling */
+						.button {
+							display: inline-block;
+							padding: 10px 20px;
+							margin: 10px;
+							background: #2575fc;
+							color: #f41515;
+							text-decoration: none;
+							border-radius: 5px;
+							transition: all 0.3s ease-in-out;
+						}
+
+						.button:hover {
+							background: #6a11cb;
+							box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.2);
+							transform: translateY(-3px);
+						}
+
+								#moveComment {
+									margin-bottom: 20px;
+									font-size: 18px;
+									font-weight: bold;
+								}
+								
+								@media screen and (max-width: 768px) {
+							.container {
+								width: 95%;
+							}
+
+							.header {
+								font-size: 1.5rem;
+								padding: 15px;
+							}
+
+							.content {
+								font-size: 1rem;
+								line-height: 1.4;
+							}
+						}
+								
+							</style>
+
+
+						</head>
+						<body>
+
+						<div id="leftPanel">
+							<div id="moveComment">Move comment will be shown here.</div>
+							<button id="newGameButton" type="button" onclick="startNewGame()">New Game</button>
+
+						</div>
+
+						<div id="chessboard"></div>
+
+						<!-- Add an audio element for the move sound -->
+						<audio id="moveSound" src="move.mp3"></audio>
+
+						<script>
+							var chessBoard = [
+								["R", "N", "B", "Q", "K", "B", "N", "R"],
+								["P", "P", "P", "P", "P", "P", "P", "P"],
+								[" ", " ", " ", " ", " ", " ", " ", " "],
+								[" ", " ", " ", " ", " ", " ", " ", " "],
+								[" ", " ", " ", " ", " ", " ", " ", " "],
+								[" ", " ", " ", " ", " ", " ", " ", " "],
+								["p", "p", "p", "p", "p", "p", "p", "p"],
+								["r", "n", "b", "q", "k", "b", "n", "r"]
+							];
+
+							var chessboard = document.getElementById('chessboard');
+							var moveComment = document.getElementById('moveComment');
+							var newGameButton = document.getElementById('newGameButton');
+							var squares = [];
+							var selectedPiece = null;
+							var pieceColor = null;
+							var turn = 'white';
+
+							function startNewGame() {
+								location.reload();
+							}
+
+							function playMoveSound() {
+								document.getElementById('moveSound').play();
+							}
+
+							for (var i = 0; i < 8; i++) {
+								for (var j = 0; j < 8; j++) {
+									var chessSquare = document.createElement('div');
+									chessSquare.className = 'chess-square dropzone';
+									chessSquare.dataset.row = i;
+									chessSquare.dataset.column = j; // Column dataset attribute added
+									if ((i + j) % 2 == 0) {
+										chessSquare.style.backgroundColor = '#990000';
+									}
+									squares.push(chessSquare);
+									chessboard.appendChild(chessSquare);
+
+									chessSquare.addEventListener('click', function() {
+										squareClicked(this);
+									});
+								}
+							}
+
+							function squareClicked(square) {
+								if (selectedPiece) {
+									if (isValidMove(square)) {
+										moveComment.innerText = `Move: ${selectedPiece.id.replace(/[0-9]/g, '').toUpperCase()} to (${square.dataset.row}, ${square.dataset.column})`;
+
+										if ((pieceColor === 'white' && square.dataset.row === '0') || (pieceColor === 'black' && square.dataset.row === '7')) {
+											promotePawn(square);
+										} else {
+											if (square.children.length > 0) {
+												var capturedPiece = square.children[0];
+												capturedPiece.parentElement.removeChild(capturedPiece);
+											}
+											square.appendChild(selectedPiece);
+											selectedPiece.classList.remove('token');
+											selectedPiece.classList.remove('draggable');
+											selectedPiece = null;
+											turn = turn === 'white' ? 'black' : 'white';
+											removeHighlights();
+											playMoveSound(); // Play move sound
+
+											if (isGameOver()) {
+												var winner = turn === 'white' ? 'Black' : 'White';
+												alert(`${winner} wins!`);
+												newGameButton.style.display = 'block';
+											}
+										}
+									} else {
+										removeHighlights();
+										selectedPiece = null; // Reset selected piece if move is invalid
+									}
+								} else {
+									if (square.children.length > 0) {
+										var clickedPiece = square.children[0];
+										var clickedPieceColor = clickedPiece.classList.contains('white') ? 'white' : 'black';
+										if (clickedPieceColor === turn) {
+											if (selectedPiece) { // Deselect the previous piece
+												selectedPiece.classList.remove('token');
+												selectedPiece.classList.remove('draggable');
+											}
+											selectedPiece = clickedPiece;
+											selectedPiece.classList.add('token');
+											pieceColor = selectedPiece.classList.contains('white') ? 'white' : 'black';
+											highlightValidMoves(square);
+										}
+									}
+								}
+							}
+
+							function isValidMove(square) {
+								var selectedSquareIndex = squares.indexOf(square);
+								var pieceSquareIndex = squares.indexOf(selectedPiece.parentElement);
+								var selectedSquareRow = Math.floor(selectedSquareIndex / 8);
+								var selectedSquareColumn = selectedSquareIndex % 8;
+								var pieceSquareRow = Math.floor(pieceSquareIndex / 8);
+								var pieceSquareColumn = pieceSquareIndex % 8;
+								var pieceType = selectedPiece.id.replace(/[0-9]/g, '');
+
+								if (selectedSquareRow < 0 || selectedSquareRow >= 8 || selectedSquareColumn < 0 || selectedSquareColumn >= 8) {
+									return false;
+								}
+
+								if (pieceType === "pawn") {
+									if (pieceColor === "black") {
+										if (selectedSquareColumn === pieceSquareColumn && selectedSquareRow === pieceSquareRow - 1 && square.children.length === 0) {
+											return true;
+										}
+										if (selectedSquareColumn === pieceSquareColumn && pieceSquareRow === 6 && selectedSquareRow === 4 && square.children.length === 0) {
+											return true;
+										}
+										if (Math.abs(selectedSquareColumn - pieceSquareColumn) === 1 && selectedSquareRow === pieceSquareRow - 1 && square.children.length > 0) {
+											return true;
+										}
+									} else if (pieceColor === "white") {
+										if (selectedSquareColumn === pieceSquareColumn && selectedSquareRow === pieceSquareRow + 1 && square.children.length === 0) {
+											return true;
+										}
+										if (selectedSquareColumn === pieceSquareColumn && pieceSquareRow === 1 && selectedSquareRow === 3 && square.children.length === 0) {
+											return true;
+										}
+										if (Math.abs(selectedSquareColumn - pieceSquareColumn) === 1 && selectedSquareRow === pieceSquareRow + 1 && square.children.length > 0) {
+											return true;
+										}
+									}
+								} else if (pieceType === "rook") {
+									if (selectedSquareRow === pieceSquareRow || selectedSquareColumn === pieceSquareColumn) {
+										if (!isPathBlocked(pieceSquareRow, pieceSquareColumn, selectedSquareRow, selectedSquareColumn)) {
+											return true;
+										}
+									}
+								} else if (pieceType === "knight") {
+									if ((Math.abs(selectedSquareRow - pieceSquareRow) === 2 && Math.abs(selectedSquareColumn - pieceSquareColumn) === 1) ||
+										(Math.abs(selectedSquareRow - pieceSquareRow) === 1 && Math.abs(selectedSquareColumn - pieceSquareColumn) === 2)) {
+										return true;
+									}
+								} else if (pieceType === "bishop") {
+									if (Math.abs(selectedSquareRow - pieceSquareRow) === Math.abs(selectedSquareColumn - pieceSquareColumn)) {
+										if (!isPathBlocked(pieceSquareRow, pieceSquareColumn, selectedSquareRow, selectedSquareColumn)) {
+											return true;
+										}
+									}
+								} else if (pieceType === "queen") {
+									if ((selectedSquareRow === pieceSquareRow || selectedSquareColumn === pieceSquareColumn) ||
+										(Math.abs(selectedSquareRow - pieceSquareRow) === Math.abs(selectedSquareColumn - pieceSquareColumn))) {
+										if (!isPathBlocked(pieceSquareRow, pieceSquareColumn, selectedSquareRow, selectedSquareColumn)) {
+											return true;
+										}
+									}
+								} else if (pieceType === "king") {
+									if (Math.abs(selectedSquareRow - pieceSquareRow) <= 1 && Math.abs(selectedSquareColumn - pieceSquareColumn) <= 1) {
+										return true;
+									}
+								}
+
+								return false;
+							}
+
+							function isPathBlocked(startRow, startColumn, endRow, endColumn) {
+								var rowDirection = endRow > startRow ? 1 : (endRow < startRow ? -1 : 0);
+								var columnDirection = endColumn > startColumn ? 1 : (endColumn < startColumn ? -1 : 0);
+								var row = startRow + rowDirection;
+								var column = startColumn + columnDirection;
+
+								while (row !== endRow || column !== endColumn) {
+									var index = row * 8 + column;
+									if (squares[index].children.length > 0) {
+										return true;
+									}
+									row += rowDirection;
+									column += columnDirection;
+								}
+
+								return false;
+							}
+
+							function highlightValidMoves(square) {
+								var pieceSquareIndex = squares.indexOf(square);
+								var pieceSquareRow = Math.floor(pieceSquareIndex / 8);
+								var pieceSquareColumn = pieceSquareIndex % 8;
+
+								for (var i = 0; i < squares.length; i++) {
+									var targetSquare = squares[i];
+									var targetSquareIndex = i;
+									var targetSquareRow = Math.floor(targetSquareIndex / 8);
+									var targetSquareColumn = targetSquareIndex % 8;
+
+									if (isValidMove(targetSquare)) {
+										targetSquare.classList.add('highlighted');
+									}
+								}
+							}
+
+							function removeHighlights() {
+								squares.forEach(function(square) {
+									square.classList.remove('highlighted');
+								});
+							}
+
+							function promotePawn(square) {
+								var selectedSquareIndex = squares.indexOf(square);
+								var pieceSquareIndex = squares.indexOf(selectedPiece.parentElement);
+								var selectedSquareRow = Math.floor(selectedSquareIndex / 8);
+								var selectedSquareColumn = selectedSquareIndex % 8;
+								var pieceSquareRow = Math.floor(pieceSquareIndex / 8);
+								var pieceSquareColumn = pieceSquareIndex % 8;
+
+								if ((pieceColor === 'white' && selectedSquareRow === 0) || (pieceColor === 'black' && selectedSquareRow === 7)) {
+									var newPieceType = prompt('Promote pawn to: (queen, rook, bishop, knight)', 'queen');
+									var newPieceId = newPieceType.charAt(0).toLowerCase();
+									if (pieceColor === 'white') {
+										newPieceId = newPieceId.toUpperCase();
+									}
+									var newPiece = document.createElement('div');
+									newPiece.className = `chess-piece ${pieceColor} token draggable`;
+									newPiece.id = `${newPieceId}${selectedSquareRow}${selectedSquareColumn}`;
+									square.appendChild(newPiece);
+									selectedPiece.parentElement.removeChild(selectedPiece);
+									selectedPiece = null;
+									turn = turn === 'white' ? 'black' : 'white';
+									removeHighlights();
+									playMoveSound(); // Play move sound
+
+									if (isGameOver()) {
+										var winner = turn === 'white' ? 'Black' : 'White';
+										alert(`${winner} wins!`);
+										newGameButton.style.display = 'block';
+									}
+								}
+							}
+							
+							function createToken(src, color, id) {
+									var token = document.createElement('img');
+									token.src = src;
+									token.alt = "chess";
+									token.className = "token draggable " + color;
+									token.width = 90;
+									token.height = 90;
+									token.draggable = "true";
+									token.id = id;
+									token.addEventListener('dragstart', function(event) {
+										if (color === turn) {
+											selectedPiece = this;
+											pieceColor = this.classList.contains('white') ? 'white' : 'black';
+										} else {
+											event.preventDefault();
+										}
+									});
+									return token;
+								}
+
+								chessboard.addEventListener('dragover', function(event) {
+									event.preventDefault();
+								});
+
+								chessboard.addEventListener('drop', function(event) {
+									event.preventDefault();
+									var square = event.target.closest('.chess-square');
+									if (square && isValidMove(square)) {
+										square.appendChild(selectedPiece);
+										selectedPiece.classList.remove('token');
+										selectedPiece.classList.remove('draggable');
+										selectedPiece = null;
+										turn = turn === 'white' ? 'black' : 'white';
+										removeHighlights();
+									}
+								});
+
+								function removeHighlights() {
+									squares.forEach(square => {
+										if (square.classList.contains('dropzone')) {
+											square.style.backgroundColor = (parseInt(square.dataset.column) + parseInt(square.dataset.row)) % 2 === 0 ? '#990000' : '#fff2de';
+										}
+										square.classList.remove('highlighted');
+									});
+								}
+
+								squares[0].appendChild(createToken("tokenrooks0.png", "white", "rook0"));
+								squares[1].appendChild(createToken("tokenknight0.png", "white", "knight0"));
+								squares[2].appendChild(createToken("tokenbishope0.png", "white", "bishop0"));
+								squares[3].appendChild(createToken("tokenqueen0.png", "white", "queen0"));
+								squares[4].appendChild(createToken("tokenking0.png", "white", "king0"));
+								squares[5].appendChild(createToken("tokenbishope0.png", "white", "bishop1"));
+								squares[6].appendChild(createToken("tokenknight0.png", "white", "knight1"));
+								squares[7].appendChild(createToken("tokenrooks0.png", "white", "rook1"));
+								for (var i = 8; i < 16; i++) {
+									squares[i].appendChild(createToken("tokenpawn0.png", "white", "pawn" + (i - 8)));
+								}
+
+								squares[56].appendChild(createToken("tokenrooks1.png", "black", "rook2"));
+								squares[57].appendChild(createToken("tokenknight1.png", "black", "knight2"));
+								squares[58].appendChild(createToken("tokenbishope1.png", "black", "bishop2"));
+								squares[59].appendChild(createToken("tokenqueen1.png", "black", "queen1"));
+								squares[60].appendChild(createToken("tokenking1.png", "black", "king1"));
+								squares[61].appendChild(createToken("tokenbishope1.png", "black", "bishop3"));
+								squares[62].appendChild(createToken("tokenknight1.png", "black", "knight3"));
+								squares[63].appendChild(createToken("tokenrooks1.png", "black", "rook3"));
+								for (var i = 48; i < 56; i++) {
+									squares[i].appendChild(createToken("tokenpawn1.png", "black", "pawn" + (i - 48)));
+								}
+								
+								function highlightValidMoves(square) {
+									removeHighlights();
+
+									var pieceSquareIndex = squares.indexOf(selectedPiece.parentElement);
+									var pieceSquareRow = Math.floor(pieceSquareIndex / 8);
+									var pieceSquareColumn = pieceSquareIndex % 8;
+
+									for (var i = 0; i < squares.length; i++) {
+										var selectedSquareRow = Math.floor(i / 8);
+										var selectedSquareColumn = i % 8;
+
+										if (isValidMove(squares[i])) {
+											if (squares[i].children.length === 0 || (squares[i].children.length > 0 && !squares[i].children[0].classList.contains(pieceColor))) {
+												squares[i].classList.add('highlighted'); // Highlight valid moves
+											}
+										}
+									}
+								}
+								
+								function deletePiece() {
+									if (selectedPiece) {
+										selectedPiece.parentElement.removeChild(selectedPiece);
+										selectedPiece = null;
+									}
+								}
+
+								function displayBoard() {
+									for (let i = 0; i < chessBoard.length; i++) {
+										console.log(chessBoard[i].join(" | "));
+										console.log("--------------------------");
+									}
+								}
+
+								
+								displayBoard();
+							
+							
+
+						</script>
+						</body>
+						</html>
